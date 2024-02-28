@@ -13,12 +13,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { SignupFormSchema } from "@/lib/validations";
 import { z } from "zod";
-import { useState } from "react";
 import Loader from "@/components/shared/Loader";
 import { Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  useCrerateUserAccount,
+  useSignInUser,
+} from "@/lib/react-query/queriesAndMutations";
 
 function SignupForm() {
-  const [isLoading, setIsLoading] = useState(false);
+  const { mutateAsync: createUserAccount, isPending: isCreatingUser } =
+    useCrerateUserAccount();
+  const { mutateAsync: signInUser } = useSignInUser();
+  const { toast } = useToast();
+
   // 1. Define your form.
   const form = useForm<z.infer<typeof SignupFormSchema>>({
     resolver: zodResolver(SignupFormSchema),
@@ -30,18 +38,48 @@ function SignupForm() {
     },
   });
 
-  // 2. Define a submit handler.
-  function onSubmit(values: z.infer<typeof SignupFormSchema>) {
-    // Do something with the form values.
-    // ✅ This will be type-safe and validated.
-    console.log(values);
+  async function handleSignup(values: z.infer<typeof SignupFormSchema>) {
+    const newUser = createUserAccount(values);
+    if (!newUser) {
+      toast({
+        title: "Error",
+        description: "Error in user sign up",
+      });
+    }
+    const session = signInUser({
+      email: values.email,
+      password: values.password,
+    });
+    if (!session) {
+      toast({
+        title: "Error",
+        description: "Error in user sign in",
+      });
+    }
   }
   return (
     <Form {...form}>
       <img src="/assets/images/logo.png" alt="Logo" className="w-20" />
       <h2 className="font-bold my-2 ">Create a new account</h2>
       <p className="text-sm my-1">To use LoopLink, Please enter your details</p>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 w-1/3">
+      <form
+        onSubmit={form.handleSubmit(handleSignup)}
+        className="space-y-8 w-1/3"
+      >
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input type="text" className="shad-input w-full" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="username"
@@ -87,7 +125,7 @@ function SignupForm() {
         />
         <div className="flex justify-center">
           <Button type="submit" className="shad-button_primary w-full">
-            {isLoading ? (
+            {isCreatingUser ? (
               <div className="flex-center gap-2">
                 <Loader /> Loading
               </div>
